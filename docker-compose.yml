@@ -1,13 +1,28 @@
 version: '3'
 
 services:
-  db:
-    build:
-      context: .
-      dockerfile: Dockerfile
+  postgres:
+    image: postgres:latest
+    environment:
+      - POSTGRES_DB=${DATABASE_NAME}
+      - POSTGRES_USER=${DATABASE_USERNAME}
+      - POSTGRES_PASSWORD=${DATABASE_PASSWORD}
+      - MIGRATION_VERSION=${MIGRATION_VERSION:-latest}
     ports:
-      - "32769:5432"
+      - "${DATABASE_PORT}:5432"
     volumes:
-      - db-data:/var/lib/postgresql/data
-volumes:
-  db-data:
+      - .env:/config/env
+      - ./migrations:/migrations/
+      - ./init_scripts:/docker-entrypoint-initdb.d
+  data_generation:
+    build: ./data_generation
+    environment:
+      - POSTGRES_DB=${DATABASE_NAME}
+      - POSTGRES_USER=${DATABASE_USERNAME}
+      - POSTGRES_PASSWORD=${DATABASE_PASSWORD}
+      - POSTGRES_PORT=${DATABASE_PORT}
+      - NUM_RECORDS=${ENTITIES_QUANTITY:-1000000}
+    volumes:
+      - ./data_generation:/src
+    depends_on:
+      - postgres
