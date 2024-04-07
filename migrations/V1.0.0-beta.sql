@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS Users
 (
     user_id       uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     name          VARCHAR(256) NOT NULL,
-    phone_number  VARCHAR(15) NOT NULL,
+    phone_number  VARCHAR(15)  NOT NULL,
     email_address VARCHAR(320),
     photo         bytea,
     password      VARCHAR
@@ -76,9 +76,14 @@ CREATE TABLE IF NOT EXISTS ShoppingCarts
     PRIMARY KEY (user_id, product_id)
 );
 
-DROP TYPE IF EXISTS order_status;
-CREATE TYPE order_status AS ENUM ('CREATED', 'IN_PROGRESS', 'CANCELED', 'DELIVERED');
-
+DO
+$$
+    BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typename = 'order_status') THEN
+            CREATE TYPE order_status AS ENUM ('CREATED', 'IN_PROGRESS', 'CANCELED', 'DELIVERED');
+        end if;
+    END
+$$;
 CREATE TABLE IF NOT EXISTS OrderHeaders
 (
     order_id    uuid PRIMARY KEY,
