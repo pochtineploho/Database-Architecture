@@ -3,21 +3,18 @@
 # Определение переменной окружения для версии миграции
 MIGRATION_VERSION=${MIGRATION_VERSION:-latest}
 
-# Если версия миграции указана как "latest", найдем последнюю версию
+# Выполнение миграций в зависимости от версии
 if [ "$MIGRATION_VERSION" == "latest" ]; then
-    LATEST_VERSION=$(ls -1 /migrations | grep -E "^[0-9]+\.[0-9]+\.sql$" | sort -V | tail -n1)
-    if [ -n "$LATEST_VERSION" ]; then
-        MIGRATION_VERSION=$LATEST_VERSION
-    else
-        echo "Не найдено миграций"
-        exit 1
-    fi
+    # Выполнить все миграции
+    for migration_script in /migrations/*.sql; do
+        psql -U postgres -d flowwow -f "$migration_script"
+    done
+else
+    # Выполнить миграции до указанной версии
+    for migration_script in /migrations/V*.sql; do
+        version=$(basename "$migration_script" .sql | sed 's/^V//')
+        if ! [ "$version" \> "$MIGRATION_VERSION" ]; then
+            psql -U postgres -d flowwow -f "$migration_script"
+        fi
+    done
 fi
-
-# Выполнение всех миграций до указанной версии включительно
-for migration_file in $(ls -1 /migrations | grep -E "^[0-9]+\.[0-9]+\.sql$" | sort -V); do
-    if [ "$(basename "$migration_file")" \> "$MIGRATION_VERSION" ]; then
-        break
-    fi
-    psql -U postgres -d flowwow -f "/migrations/$migration_file"
-done
