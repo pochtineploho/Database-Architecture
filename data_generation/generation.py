@@ -1,3 +1,4 @@
+import decimal
 import os
 import sys
 import random
@@ -34,6 +35,8 @@ while not success:
 print("Connected successfully")
 
 fake = Faker(locale='ru_RU')
+max_decimal_value = decimal.Decimal('Infinity')
+max_elements_selected = 1000
 
 
 class CustomProvider(BaseProvider):
@@ -94,7 +97,6 @@ category_names = ["Цветы и подарки", "Кондитерские и �
                   "Одежда", "Одежда для детей", "Хендмейд и хобби", "Товары для праздника", "Книги", "Картины",
                   "Зоотовары", "Подарочные сертификаты", "Для дома", "Канцелярские товары", "Другое"]
 
-
 cur = connection.cursor()
 user_generator = UserGenerator()
 shop_generator = ShopGenerator()
@@ -137,6 +139,35 @@ for category in category_names:
                VALUES (%s, %s)
                """, (subcategory, category_id))
 print("Subcategories generated")
+
+available_max_limits = list(range(1000, 10001, 1000))
+cur.execute("SELECT shop_id FROM Shops")
+while True:
+    batch = cur.fetchmany(max_elements_selected)  # Получаем порции данных по 1000 записей за раз
+    if not batch:
+        break
+    for shop in batch:
+        shop_id = shop[0]
+        num_limits = random.randint(0, 2)  # Случайное количество лимитов для магазина
+        max_limits = available_max_limits[:]
+        max_limit_exists = False
+
+        # Вставка данных в таблицу deliveryPrices
+        for _ in range(num_limits):
+            price = random.randint(0, 10) * 100  # Генерация случайной цены для доставки
+            if not max_limit_exists:
+                max_limit_exists = True
+                max_limit = max_decimal_value
+            else:
+                max_limit = random.choice(max_limits)  # Генерация случайного максимального лимита
+                max_limits.remove(max_limit)
+            cur.execute("""
+                INSERT INTO DeliveryPrices (shop_id, price, max_limit)
+                VALUES (%s, %s, %s)
+            """, (shop_id, price, max_limit))
+print("Delivery prices generated")
+
+
 
 cur.close()
 connection.commit()
