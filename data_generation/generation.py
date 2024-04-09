@@ -276,8 +276,12 @@ for _ in range(num_records // 10):
                             INSERT INTO collectionheaders (collection_id, user_id, description, public)
                             VALUES (%s, %s, %s, %s)
                             """, (collection_id, user_id, description, public))
+    used_products = []
     for i in range(random.randint(1, 10)):
         product_id = random.choice(products)
+        while product_id in used_products:
+            product_id = random.choice(products)
+        used_products.append(product_id)
         cur.execute("""
                             INSERT INTO collectiondetails (collection_id, product_id)
                             VALUES (%s, %s)
