@@ -337,7 +337,7 @@ for _ in range(num_records // 10):
                             INSERT INTO messages (dialog_id, message, time, sender_is_user, message_is_read)
                             VALUES (%s, %s, %s, %s, %s)
                             """, (dialog_id, message, sender_is_user, message_is_read, time))
-
+print("Dialogs and messages generated")
 
 cur.close()
 connection.commit()
