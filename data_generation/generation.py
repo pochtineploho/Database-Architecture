@@ -172,7 +172,7 @@ for product_id in products:
     used_words = []
     for _ in range(num_structure):
         element = fake.word()
-        while used_words.__contains__(element):
+        while element in used_words:
             element = fake.word()
         used_words.append(element)
         quantity = random.randint(1, 10)
@@ -187,7 +187,7 @@ for _ in range(num_records // 10):
     used_shops = []
     for shop in range(random.randint(1, 5)):
         random_shop = random.choice(shops)
-        while used_shops.__contains__(random_shop):
+        while random_shop in used_shops:
             random_shop = random.choice(shops)
         used_shops.append(random_shop)
         cur.execute("""
@@ -307,8 +307,12 @@ print("Dialogs and messages generated")
 
 for user in users:
     if fake.pybool():
+        used_products = []
         for i in range(random.randint(1, 10)):
             product_id = random.choice(products)
+            while product_id in used_products:
+                product_id = random.choice(products)
+            used_products.append(product_id)
             quantity = random.randint(1, 10)
             cur.execute("""
                                 INSERT INTO shoppingcarts (user_id, product_id, quantity)

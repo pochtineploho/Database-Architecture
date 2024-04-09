@@ -33,16 +33,15 @@ version_compare() {
     return 0
 }
 
-# Выполнение миграций в зависимости от версии
-if [ "$MIGRATION_VERSION" == "latest" ]; then
+ if [ "$MIGRATION_VERSION" == "latest" ]; then
     # Выполнить все миграции
-    for migration_script in $(ls /migrations/V*.sql | sort -V); do
+    for migration_script in $(ls /migrations/V*.{sql,sh} | sort -V); do
         psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f "$migration_script"
     done
 else
     # Выполнить миграции до указанной версии
-    for migration_script in $(ls /migrations/V*.sql | sort -V); do
-        version=$(basename "$migration_script" .sql | sed 's/^V//')
+    for migration_script in $(ls /migrations/V*.{sql,sh} | sort -V); do
+        version=$(basename "$migration_script" | sed 's/^V//')
         if version_compare "$version" "$MIGRATION_VERSION"; then
             psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f "$migration_script"
         fi
