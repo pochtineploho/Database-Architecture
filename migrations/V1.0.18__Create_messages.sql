@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS Messages
 (
-    message_id      uuid PRIMARY KEY,
+    message_id      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     dialog_id       uuid NOT NULL REFERENCES Dialogs (dialog_id),
     message         TEXT NOT NULL,
     time            TIMESTAMP,
