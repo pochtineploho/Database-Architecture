@@ -1,3 +1,2 @@
 Faker
 psycopg2-binary
-numpy
