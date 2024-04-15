@@ -39,7 +39,7 @@ version_compare() {
       if [[ $migration_script == *.sh ]]; then
          bash "$migration_script"
       else
-        psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f "$migration_script"
+         psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f "$migration_script"
       fi
     done
 
