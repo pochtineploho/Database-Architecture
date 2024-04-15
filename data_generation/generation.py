@@ -323,7 +323,7 @@ for user in users:
                                 VALUES (%s, %s, %s)
                                 """, (user, product_id, quantity))
 print("Shopping carts generated")
-
+print("Done")
 cur.close()
 connection.commit()
 connection.close()
