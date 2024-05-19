@@ -205,8 +205,8 @@ for product_id in products:
                         """, (product_id, element, quantity))
 print("Structures and price histories generated")
 
-for _ in range(num_records // 3):
-    random_user = random.choice(users)
+for i in range(num_records // 3):
+    random_user = users[i * 2]
     used_shops = []
     for shop in range(random.randint(1, 5)):
         random_shop = random.choice(shops)
@@ -237,9 +237,14 @@ for _ in range(2 * num_records // 3):
     cur.execute("SELECT product_id FROM Products WHERE shop_id = %s", (random_shop,))
     shop_products = cur.fetchall()
     products_for_rating = []
-    for order_details in range(random.randint(1, 5)):
+    used_products = []
+    for order_details in range(random.randint(1, len(shop_products))):
         quantity = random.randint(1, 10)
         product_id = random.choice(shop_products)
+        while product_id in used_products:
+            product_id = random.choice(shop_products)
+        used_products.append(product_id)
+
         products_for_rating.append(product_id)
         shop_products.remove(product_id)
         cur.execute("""
