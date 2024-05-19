@@ -59,6 +59,26 @@ category_names = ["Flowers and Gifts", "Confectionery and Bakeries", "Live Plant
 
 cur = connection.cursor()
 
+# Users = n
+# Shops = n/5
+# Categories = 21
+# Subcategories = 210
+# Delivery prices = n/5
+# Products = n
+# PriceHistories = 2n
+# Structures = 1.5n
+# FavoriteLists = n
+# OrderHeaders = 2n/3
+# OrderDetails = 2n
+# UserReviews = n/3
+# ShopReviews = n/3
+# CollectionHeaders = n/5
+# CollectionDetails = n
+# Dialogs = n/5
+# Messages = n
+# Shopping Carts = n
+
+
 for _ in range(num_records):
     user_name = fake.name()
     phone_number = generate_phone_number()
@@ -70,11 +90,12 @@ for _ in range(num_records):
     VALUES (%s, %s, %s, %s, %s)
     """, (user_name, phone_number, email_address, photo, password))
 print("Users generated")
+
 cur.execute("SELECT user_id FROM Users")
 users_t = cur.fetchall()
 users = [tup[0] for tup in users_t]
 
-for _ in range(num_records):
+for _ in range(num_records // 5):
     shop_name = fake.company()
     photo = generate_photo()
     address = fake.address()
@@ -86,6 +107,7 @@ for _ in range(num_records):
     VALUES (%s, %s, %s, %s, %s, %s)
     """, (shop_name, photo, address, description, legal_details, password))
 print("Shops generated")
+
 cur.execute("SELECT shop_id FROM Shops")
 shops_t = cur.fetchall()
 shops = [tup[0] for tup in shops_t]
@@ -138,7 +160,7 @@ for shop_id in shops:
 print("Delivery prices generated")
 
 for shop_id in shops:
-    num_products = random.randint(5, 10)  # Случайное количество продуктов для магазина
+    num_products = random.randint(3, 7)  # Случайное количество продуктов для магазина
     for _ in range(num_products):
         name = fake.word()
         subcategory_id = random.choice(subcategories)
@@ -151,6 +173,7 @@ for shop_id in shops:
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
             """, (name, subcategory_id, photo, description, shop_id, width, height))
 print("Products generated")
+
 cur.execute("SELECT product_id FROM Products")
 products_t = cur.fetchall()
 products = [tup[0] for tup in products_t]
@@ -163,8 +186,8 @@ for product_id in products:
         price = random.randint(100, 10000)
         time = fake.date_time_between(start_date=rnd_start_date, end_date=rnd_end_date)
         cur.execute("""
-                            INSERT INTO PriceHistories (product_id, time, price)
-                            VALUES (%s, %s, %s)
+                    INSERT INTO PriceHistories (product_id, time, price)
+                    VALUES (%s, %s, %s)
                         """, (product_id, time, price))
 
     num_structure = random.randint(0, 3)
@@ -177,12 +200,12 @@ for product_id in products:
         used_words.append(element)
         quantity = random.randint(1, 10)
         cur.execute("""
-                            INSERT INTO Structures (product_id, element, quantity)
-                            VALUES (%s, %s, %s)
+                        INSERT INTO Structures (product_id, element, quantity)
+                         VALUES (%s, %s, %s)
                         """, (product_id, element, quantity))
 print("Structures and price histories generated")
 
-for _ in range(num_records // 10):
+for _ in range(num_records // 3):
     random_user = random.choice(users)
     used_shops = []
     for shop in range(random.randint(1, 5)):
@@ -191,13 +214,13 @@ for _ in range(num_records // 10):
             random_shop = random.choice(shops)
         used_shops.append(random_shop)
         cur.execute("""
-                            INSERT INTO favoritelists (user_id, shop_id)
-                            VALUES (%s, %s)
+                        INSERT INTO favoritelists (user_id, shop_id)
+                        VALUES (%s, %s)
                         """, (random_user, random_shop))
 print("Favorite lists generated")
 
 statuses = ['CREATED', 'IN_PROGRESS', 'CANCELED', 'DELIVERED']
-for _ in range(num_records):
+for _ in range(2 * num_records // 3):
     random_user = random.choice(users)
     order_id = str(uuid.uuid4())
     status = random.choice(statuses)
@@ -206,9 +229,9 @@ for _ in range(num_records):
     time = fake.date_time_between(start_date=rnd_start_date, end_date=rnd_end_date)
     card_number = fake.credit_card_number()
     cur.execute("""
-                                INSERT INTO orderheaders (order_id, user_id, status, time, card_number)
-                                VALUES (%s, %s, %s, %s, %s)
-                            """, (order_id, random_user, status, time, card_number))
+                        INSERT INTO orderheaders (order_id, user_id, status, time, card_number)
+                        VALUES (%s, %s, %s, %s, %s)
+                        """, (order_id, random_user, status, time, card_number))
 
     random_shop = random.choice(shops)
     cur.execute("SELECT product_id FROM Products WHERE shop_id = %s", (random_shop,))
@@ -220,13 +243,13 @@ for _ in range(num_records):
         products_for_rating.append(product_id)
         shop_products.remove(product_id)
         cur.execute("""
-                                    SELECT price 
-                                    FROM pricehistories 
-                                    WHERE product_id = %s
-                                    AND time <= %s
-                                    ORDER BY time DESC 
-                                    LIMIT 1;
-                                """, (product_id, time))
+                            SELECT price 
+                            FROM pricehistories 
+                            WHERE product_id = %s
+                            AND time <= %s
+                            ORDER BY time DESC 
+                            LIMIT 1;
+                            """, (product_id, time))
         price = cur.fetchone()
         cur.execute("""
                             INSERT INTO orderdetails (order_id, product_id, quantity, price)
@@ -267,15 +290,15 @@ for _ in range(num_records):
 print("Orders generated")
 print("Reviews generated")
 
-for _ in range(num_records // 10):
+for _ in range(num_records // 5):
     collection_id = str(uuid.uuid4())
     user_id = random.choice(users)
     description = fake.sentence()
     public = fake.pybool()
     cur.execute("""
-                            INSERT INTO collectionheaders (collection_id, user_id, description, public)
-                            VALUES (%s, %s, %s, %s)
-                            """, (collection_id, user_id, description, public))
+                        INSERT INTO collectionheaders (collection_id, user_id, description, public)
+                        VALUES (%s, %s, %s, %s)
+                        """, (collection_id, user_id, description, public))
     used_products = []
     for i in range(random.randint(1, 10)):
         product_id = random.choice(products)
@@ -289,7 +312,7 @@ for _ in range(num_records // 10):
 
 print("Collections generated")
 
-for _ in range(num_records // 10):
+for _ in range(num_records // 5):
     dialog_id = str(uuid.uuid4())
     random_user = random.choice(users)
     random_shop = random.choice(shops)
@@ -309,8 +332,10 @@ for _ in range(num_records // 10):
                             """, (dialog_id, message, time, sender_is_user, message_is_read))
 print("Dialogs and messages generated")
 
+counter = 0
 for user in users:
-    if fake.pybool():
+    counter += 1
+    if (counter % 5) == 0:
         used_products = []
         for i in range(random.randint(1, 10)):
             product_id = random.choice(products)
