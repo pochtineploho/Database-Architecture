@@ -21,7 +21,7 @@ services:
       - POSTGRES_DB=${DATABASE_NAME}
       - POSTGRES_USER=${DATABASE_USERNAME}
       - POSTGRES_PASSWORD=${DATABASE_PASSWORD}
-      - POSTGRES_PORT=${DATABASE_PORT}
+      - POSTGRES_PORT=5432
       - NUM_RECORDS=${ENTITIES_QUANTITY:-1000000}
     volumes:
       - ./data_generation:/src
@@ -34,11 +34,8 @@ services:
       - POSTGRES_DB=${DATABASE_NAME}
       - POSTGRES_USER=${DATABASE_USERNAME}
       - POSTGRES_PASSWORD=${DATABASE_PASSWORD}
-      - POSTGRES_PORT=${DATABASE_PORT}
+      - POSTGRES_PORT=5432
       - ATTEMPTS=${ATTEMPTS:-3}
     volumes:
       - ./performance_test:/src
-      - ./performance_test/results:/src/query_performance_results
-    depends_on:
-      - postgres
-      - data_generation
+      - ./performance_test/results:/src/results

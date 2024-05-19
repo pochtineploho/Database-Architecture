@@ -63,7 +63,7 @@ cur = connection.cursor()
 # Shops = n/5
 # Categories = 21
 # Subcategories = 210
-# Delivery prices = n/5
+# Delivery prices = 2n/5
 # Products = n
 # PriceHistories = 2n
 # Structures = 1.5n
@@ -145,7 +145,7 @@ for shop_id in shops:
     max_limit_exists = False
 
     # Вставка данных в таблицу deliveryPrices
-    for _ in range(num_products):
+    for _ in range(random.randint(1, 4)):
         price = random.randint(0, 10) * 100  # Генерация случайной цены для доставки
         if not max_limit_exists:
             max_limit_exists = True
@@ -354,6 +354,8 @@ for user in users:
                                 """, (user, product_id, quantity))
 print("Shopping carts generated")
 print("Done")
+
 cur.close()
 connection.commit()
 connection.close()
+

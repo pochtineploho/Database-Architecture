@@ -1,6 +1,9 @@
-import os
-import psycopg2
 import datetime
+import os
+import time
+import re
+
+import psycopg2
 
 
 def connect_db():
@@ -9,7 +12,7 @@ def connect_db():
         dbname=os.getenv("POSTGRES_DB"),
         user=os.getenv("POSTGRES_USER"),
         password=os.getenv("POSTGRES_PASSWORD"),
-        port=os.getenv("POSTGRES_PORT")
+        port=5432
     )
 
 
@@ -20,24 +23,48 @@ def run_explain_analyze(query, attempts):
             for _ in range(attempts):
                 cursor.execute(f"EXPLAIN ANALYZE {query}")
                 result = cursor.fetchall()
+                total_cost = 0
                 for row in result:
-                    if "Total Cost" in row[0]:
-                        cost = float(row[0].split('=')[-1].split(' ')[0])
-                        costs.append(cost)
+                    if "cost=" in row[0]:
+                        # Extracting the total cost value from each row
+                        cost_part = re.search(r'cost=(\d+\.\d+)\.\.(\d+\.\d+)', row[0])
+                        if cost_part:
+                            end_cost = float(cost_part.group(2))
+                            total_cost += end_cost
+                costs.append(total_cost)
     return costs
 
 
 def write_results(query_name, costs):
-    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-    filepath = f"/src/query_performance_results/{query_name}_{timestamp}.txt"
-    with open(filepath, 'w') as file:
-        file.write(f"Query: {query_name}\n")
-        file.write(f"Best Case: {min(costs)}\n")
-        file.write(f"Average Case: {sum(costs) / len(costs)}\n")
-        file.write(f"Worst Case: {max(costs)}\n")
+    if costs:
+        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+        filepath = f"/src/query_performance_results/{query_name}_{timestamp}.txt"
+        with open(filepath, 'w') as file:
+            file.write(f"Query: {query_name}\n")
+            file.write(f"Best Case: {min(costs)}\n")
+            file.write(f"Average Case: {sum(costs) / len(costs)}\n")
+            file.write(f"Worst Case: {max(costs)}\n")
+    else:
+        print(f"No costs were recorded for query {query_name}.")
+
+
+def wait_for_db():
+    retries = 5
+    while retries > 0:
+        try:
+            conn = connect_db()
+            conn.close()
+            return True
+        except psycopg2.OperationalError:
+            retries -= 1
+            print("Database not ready yet, waiting...")
+            time.sleep(10)
+    raise Exception("Database not available")
 
 
 if __name__ == "__main__":
+    wait_for_db()
+
     queries = [
         {
             "name": "Order Statistics",
@@ -67,24 +94,31 @@ if __name__ == "__main__":
             "name": "Products and Shops by Rating and Name",
             "query": """
                 SELECT
-                    s.name AS shop_name,
-                    p.name AS product_name
+                    p.product_id,
+                    p.name AS product_name,
+                    COALESCE(AVG(sr.matching_rating + sr.service_rating + sr.price_quality_rating) / 3, 0) AS avg_rating,
+                    s.shop_id,
+                    s.name AS shop_name
                 FROM
-                    Shops s
+                    Products p
                 JOIN
-                    Products p ON s.shop_id = p.shop_id
+                    Shops s ON p.shop_id = s.shop_id
+                LEFT JOIN
+                    ShopReviews sr ON p.product_id = sr.product_id
+                GROUP BY
+                    p.product_id, p.name, s.shop_id, s.name
                 ORDER BY
-                    p.name, s.name;
+                    avg_rating DESC, p.name ASC, s.name ASC;
             """
         },
         {
-            "name": "Customer Statistics",
+            "name": "Most popular shop",
             "query": """
                 SELECT
                     u.user_id,
-                    u.name AS user_name,
-                    s.name AS most_frequent_shop,
-                    p.name AS most_frequent_product
+                    s.shop_id,
+                    s.name AS shop_name,
+                    COUNT(oh.order_id) AS total_orders
                 FROM
                     Users u
                 JOIN
@@ -96,11 +130,34 @@ if __name__ == "__main__":
                 JOIN
                     Shops s ON p.shop_id = s.shop_id
                 GROUP BY
-                    u.user_id, u.name, s.name, p.name
+                    u.user_id, s.shop_id, s.name
                 ORDER BY
-                    COUNT(oh.order_id) DESC
+                    total_orders DESC
                 LIMIT 1;
             """
+        },
+        {
+            "name": "Most popular product",
+            "query": """
+                    SELECT
+                        u.user_id,
+                        p.product_id,
+                        p.name AS product_name,
+                        COUNT(od.order_id) AS total_orders
+                    FROM
+                        Users u
+                    JOIN
+                        OrderHeaders oh ON u.user_id = oh.user_id
+                    JOIN
+                        OrderDetails od ON oh.order_id = od.order_id
+                    JOIN
+                        Products p ON od.product_id = p.product_id
+                    GROUP BY
+                        u.user_id, p.product_id, p.name
+                    ORDER BY
+                        total_orders DESC
+                    LIMIT 1;
+                """
         },
         {
             "name": "Most Purchased Collection",
@@ -128,3 +185,5 @@ if __name__ == "__main__":
     for query in queries:
         costs = run_explain_analyze(query["query"], attempts)
         write_results(query["name"], costs)
+
+    print("All tests passed!")
