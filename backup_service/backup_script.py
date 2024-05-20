@@ -12,11 +12,12 @@ def create_backup(backup_dir):
             [
                 "pg_dump",
                 "-h", "localhost",
-                "-p", "30000",
+                "-p", os.getenv("POSTGRES_PORT", "5432"),
                 "-U", os.getenv("POSTGRES_USER"),
                 "-d", os.getenv("POSTGRES_DB"),
                 "-f", backup_file
             ],
+            env={"PGPASSWORD": os.getenv("POSTGRES_PASSWORD")},
             check=True,
             capture_output=True,
             text=True
@@ -46,6 +47,7 @@ if __name__ == "__main__":
     if not os.path.exists(backup_dir):
         os.makedirs(backup_dir)
 
+    print("Starting backups...")
     while True:
         backup_file = create_backup(backup_dir)
         if backup_file:
