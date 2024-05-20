@@ -220,7 +220,7 @@ for i in range(num_records // 3):
 print("Favorite lists generated")
 
 statuses = ['CREATED', 'IN_PROGRESS', 'CANCELED', 'DELIVERED']
-percent = 2 * num_records // 3 // 100
+percent = 2 * num_records // 3 // 10
 for _ in range(2 * num_records // 3):
     if _ % percent == 0:
         print(str(_ // percent) + "% of orders")
