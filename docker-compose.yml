@@ -38,4 +38,21 @@ services:
       - ATTEMPTS=${ATTEMPTS:-3}
     volumes:
       - ./performance_test:/src
-      - ./performance_test/results:/src/results
+      - ./performance_test/query_performance_results:/src/query_performance_results
+    depends_on:
+      - postgres
+
+  backup_service:
+    build: ./backup_service
+    environment:
+      - POSTGRES_DB=${DATABASE_NAME}
+      - POSTGRES_USER=${DATABASE_USERNAME}
+      - POSTGRES_PASSWORD=${DATABASE_PASSWORD}
+      - BACKUP_INTERVAL_HOURS=${BACKUP_INTERVAL_HOURS:-3}
+      - MAX_BACKUPS_TO_KEEP=${MAX_BACKUPS_TO_KEEP:-3}
+      - BACKUP_DIR=/src/backups
+    volumes:
+      - ./backup_service:/src
+      - ./backup_service/backups:/src/backups
+    depends_on:
+      - postgres

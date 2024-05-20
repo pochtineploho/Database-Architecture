@@ -1,0 +1,4 @@
+Query: Order Statistics
+Best Case: 130706.29999999999
+Average Case: 130706.29999999999
+Worst Case: 130706.29999999999

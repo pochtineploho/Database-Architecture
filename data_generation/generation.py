@@ -65,7 +65,7 @@ cur = connection.cursor()
 # Subcategories = 210
 # Delivery prices = 2n/5
 # Products = n
-# PriceHistories = 2n
+# PriceHistories = 2n participant
 # Structures = 1.5n
 # FavoriteLists = n
 # OrderHeaders = 2n/3
@@ -220,7 +220,11 @@ for i in range(num_records // 3):
 print("Favorite lists generated")
 
 statuses = ['CREATED', 'IN_PROGRESS', 'CANCELED', 'DELIVERED']
+percent = 2 * num_records // 3 // 100
 for _ in range(2 * num_records // 3):
+    if _ % percent == 0:
+        print(str(_ // percent) + "% of orders")
+
     random_user = random.choice(users)
     order_id = str(uuid.uuid4())
     status = random.choice(statuses)
@@ -262,35 +266,35 @@ for _ in range(2 * num_records // 3):
                             """, (order_id, product_id, quantity, price))
 
     if fake.pybool():
+        # cur.execute("""
+        #             SELECT COUNT(*) FROM userreviews WHERE shop_id = %s AND user_id = %s
+        #         """, (random_shop, random_user))
+        # count = cur.fetchone()[0]
+        # if count == 0:
+        description = fake.sentence()
+        rating = generate_rating()
         cur.execute("""
-                    SELECT COUNT(*) FROM userreviews WHERE shop_id = %s AND user_id = %s
-                """, (random_shop, random_user))
-        count = cur.fetchone()[0]
-        if count == 0:
-            description = fake.sentence()
-            rating = generate_rating()
-            cur.execute("""
-                                INSERT INTO userreviews (user_id, shop_id, description, rating)
-                                VALUES (%s, %s, %s, %s)
-                            """, (random_user, random_shop, description, rating))
+                            INSERT INTO userreviews (user_id, shop_id, description, rating)
+                            VALUES (%s, %s, %s, %s)
+                        """, (random_user, random_shop, description, rating))
 
     if fake.pybool():
         product_id = random.choice(products_for_rating)
+        # cur.execute("""
+        #                     SELECT COUNT(*) FROM shopreviews WHERE product_id = %s AND user_id = %s
+        #                 """, (product_id, random_user))
+        # count = cur.fetchone()[0]
+        # if count == 0:
+        description = fake.sentence()
+        rating_1 = generate_rating()
+        rating_2 = generate_rating()
+        rating_3 = generate_rating()
+        photo = generate_photo()
         cur.execute("""
-                            SELECT COUNT(*) FROM shopreviews WHERE product_id = %s AND user_id = %s
-                        """, (product_id, random_user))
-        count = cur.fetchone()[0]
-        if count == 0:
-            description = fake.sentence()
-            rating_1 = generate_rating()
-            rating_2 = generate_rating()
-            rating_3 = generate_rating()
-            photo = generate_photo()
-            cur.execute("""
-                                INSERT INTO shopreviews (user_id, product_id, description, photo, matching_rating, service_rating, price_quality_rating)
-                                VALUES (%s, %s, %s, %s, %s, %s, %s)
-                                """,
-                        (random_user, product_id, description, photo, rating_1, rating_2, rating_3))
+                            INSERT INTO shopreviews (user_id, product_id, description, photo, matching_rating, service_rating, price_quality_rating)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                            """,
+                    (random_user, product_id, description, photo, rating_1, rating_2, rating_3))
 
 print("Orders generated")
 print("Reviews generated")
