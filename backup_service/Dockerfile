@@ -1,9 +1,8 @@
-FROM python:3.9-slim
-
-RUN apt-get update && apt-get install -y postgresql-client
+FROM python:latest
 
 COPY . .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-CMD ["python", "backup_script.py"]
+CMD python -u src/backup_script.py
+
