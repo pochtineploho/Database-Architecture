@@ -1,43 +1,54 @@
-version: '3'
+version: '3.8'
+
+networks:
+  patroni_network:
+    driver: bridge
 
 services:
   etcd:
-    image: quay.io/coreos/etcd:v3.5.0
-    environment:
-      - ETCD_UNSUPPORTED_ARCH=arm64
-    command: >
-      /usr/local/bin/etcd
-      --name etcd0
-      --data-dir /etcd-data
-      --listen-client-urls http://0.0.0.0:2379
-      --advertise-client-urls http://etcd:2379
-    ports:
-      - "2379:2379"
-    volumes:
-      - etcd_data:/etcd-data
+      image: quay.io/coreos/etcd:v3.5.0
+      environment:
+        - ETCD_UNSUPPORTED_ARCH=arm64
+      command: >
+        /usr/local/bin/etcd
+        --name etcd0
+        --data-dir /etcd-data
+        --listen-client-urls http://0.0.0.0:2379
+        --advertise-client-urls http://etcd:2379
+      ports:
+        - "2379:2379"
+      volumes:
+        - etcd_data:/etcd-data
+      networks:
+        - patroni_network
 
   patroni_master:
-    build: ./patroni
-    environment:
-      PATRONI_NAME: patroni_master
-      PATRONI_SCOPE: pg-cluster
-      PATRONI_RESTAPI_LISTEN: 0.0.0.0:8008
-      PATRONI_RESTAPI_CONNECT_ADDRESS: patroni_master:8008
-      PATRONI_ETCD_HOSTS: etcd:2379
-      PATRONI_POSTGRESQL_DATA_DIR: /var/lib/postgresql/data
-      PATRONI_POSTGRESQL_LISTEN: 0.0.0.0:5432
-      PATRONI_POSTGRESQL_CONNECT_ADDRESS: patroni_master:5432
-      PATRONI_SUPERUSER_USERNAME: postgres
-      PATRONI_SUPERUSER_PASSWORD: ${DATABASE_PASSWORD}
-      PATRONI_REPLICATION_USERNAME: replicator
-      PATRONI_REPLICATION_PASSWORD: ${DATABASE_PASSWORD}
-      PATRONI_ADMIN_USERNAME: admin
-      PATRONI_ADMIN_PASSWORD: admin
-    ports:
-      - "5432:5432"
-      - "8008:8008"
-    volumes:
-      - patroni_master_data:/var/lib/postgresql/data
+      build: ./patroni
+      environment:
+        PATRONI_NAME: patroni_master
+        PATRONI_SCOPE: pg-cluster
+        PATRONI_RESTAPI_LISTEN: 0.0.0.0:8008
+        PATRONI_RESTAPI_CONNECT_ADDRESS: patroni_master:8008
+        PATRONI_ETCD_HOSTS: etcd:2379
+        PATRONI_POSTGRESQL_DATA_DIR: /var/lib/postgresql/data
+        PATRONI_POSTGRESQL_LISTEN: 0.0.0.0:5432
+        PATRONI_POSTGRESQL_CONNECT_ADDRESS: patroni_master:5432
+        PATRONI_SUPERUSER_USERNAME: postgres
+        PATRONI_SUPERUSER_PASSWORD: ${DATABASE_PASSWORD}
+        PATRONI_REPLICATION_USERNAME: replicator
+        PATRONI_REPLICATION_PASSWORD: ${DATABASE_PASSWORD}
+        PATRONI_ADMIN_USERNAME: admin
+        PATRONI_ADMIN_PASSWORD: admin
+      ports:
+        - "5432:5432"
+        - "8008:8008"
+      volumes:
+        - patroni_master_data:/var/lib/postgresql/data #???
+        - ./patroni_master.yml:/etc/patroni.yml
+        - ./migrations:/migrations
+        - ./init_scripts:/docker-entrypoint-initdb.d
+      networks:
+        - patroni_network
 
   patroni_replica_1:
     build: ./patroni
@@ -61,6 +72,8 @@ services:
       - "8009:8008"
     volumes:
       - patroni_replica_1_data:/var/lib/postgresql/data
+    networks:
+      - patroni_network
 
   patroni_replica_2:
     build: ./patroni
@@ -84,6 +97,8 @@ services:
       - "8010:8008"
     volumes:
       - patroni_replica_2_data:/var/lib/postgresql/data
+    networks:
+      - patroni_network
 
   data_generation:
     build: ./data_generation
@@ -99,6 +114,8 @@ services:
       - patroni_master
       - patroni_replica_1
       - patroni_replica_2
+    networks:
+      - patroni_network
 
   performance_test:
     build: ./performance_test
@@ -115,7 +132,8 @@ services:
       - patroni_master
       - patroni_replica_1
       - patroni_replica_2
-
+    networks:
+      - patroni_network
   backup_service:
     build: ./backup_service
     environment:
@@ -133,9 +151,19 @@ services:
       - patroni_master
       - patroni_replica_1
       - patroni_replica_2
+    networks:
+      - patroni_network
 
 volumes:
   etcd_data:
   patroni_master_data:
   patroni_replica_1_data:
   patroni_replica_2_data:
+
+configs:
+  patroni_master_conf:
+    file: ./patroni_master.yml
+  patroni_replica_1_conf:
+    file: ./patroni_replica_1.yml
+  patroni_replica_2_conf:
+    file: ./patroni_replica_2.yml

@@ -24,7 +24,9 @@ RUN apt-get remove -y build-essential && \
     rm -rf /var/lib/apt/lists/*
 
 # Копируем конфигурационный файл patroni.yml в контейнер
-COPY patroni.yml /etc/patroni.yml
+COPY patroni_master.yml /etc/patroni_master.yml
+COPY patroni_replica_1.yml /etc/patroni_replica_1.yml
+COPY patroni_replica_2.yml /etc/patroni_replica_2.yml
 
 # Команда по умолчанию для запуска Patroni
-CMD ["patroni", "/etc/patroni.yml"]
+CMD ["patroni", "/etc/patroni_master.yml"]

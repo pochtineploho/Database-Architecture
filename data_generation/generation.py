@@ -9,18 +9,18 @@ import psycopg2
 from faker import Faker
 
 num_records = int(os.getenv('NUM_RECORDS'))
-time_to_connect = 30
+time_to_connect = 60
 
 time = datetime.now()
 success = False
 while not success:
     try:
         connection = psycopg2.connect(
+            dbname=os.getenv("DATABASE_NAME"),
+            user=os.getenv("DATABASE_USERNAME"),
+            password=os.getenv("DATABASE_PASSWORD"),
             host="postgres",
-            dbname=os.getenv("POSTGRES_DB"),
-            user=os.getenv("POSTGRES_USER"),
-            password=os.getenv("POSTGRES_PASSWORD"),
-            port=5432
+            port=5432,
         )
         success = True
 
@@ -362,4 +362,3 @@ print("Done")
 cur.close()
 connection.commit()
 connection.close()
-
