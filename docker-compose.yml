@@ -1,104 +1,81 @@
 version: '3.8'
 
-networks:
-  patroni_network:
-    driver: bridge
-
 services:
-  etcd:
-      image: quay.io/coreos/etcd:v3.5.0
-      environment:
-        - ETCD_UNSUPPORTED_ARCH=arm64
-      command: >
-        /usr/local/bin/etcd
-        --name etcd0
-        --data-dir /etcd-data
-        --listen-client-urls http://0.0.0.0:2379
-        --advertise-client-urls http://etcd:2379
-      ports:
-        - "2379:2379"
-      volumes:
-        - etcd_data:/etcd-data
-      networks:
-        - patroni_network
-
-  patroni_master:
-      build: ./patroni
-      environment:
-        PATRONI_NAME: patroni_master
-        PATRONI_SCOPE: pg-cluster
-        PATRONI_RESTAPI_LISTEN: 0.0.0.0:8008
-        PATRONI_RESTAPI_CONNECT_ADDRESS: patroni_master:8008
-        PATRONI_ETCD_HOSTS: etcd:2379
-        PATRONI_POSTGRESQL_DATA_DIR: /var/lib/postgresql/data
-        PATRONI_POSTGRESQL_LISTEN: 0.0.0.0:5432
-        PATRONI_POSTGRESQL_CONNECT_ADDRESS: patroni_master:5432
-        PATRONI_SUPERUSER_USERNAME: postgres
-        PATRONI_SUPERUSER_PASSWORD: ${DATABASE_PASSWORD}
-        PATRONI_REPLICATION_USERNAME: replicator
-        PATRONI_REPLICATION_PASSWORD: ${DATABASE_PASSWORD}
-        PATRONI_ADMIN_USERNAME: admin
-        PATRONI_ADMIN_PASSWORD: admin
-      ports:
-        - "5432:5432"
-        - "8008:8008"
-      volumes:
-        - patroni_master_data:/var/lib/postgresql/data #???
-        - ./patroni_master.yml:/etc/patroni.yml
-        - ./migrations:/migrations
-        - ./init_scripts:/docker-entrypoint-initdb.d
-      networks:
-        - patroni_network
-
-  patroni_replica_1:
-    build: ./patroni
+  etcd1: &etcd
+    image: patroni
+    networks: [ project_network ]
     environment:
-      PATRONI_NAME: patroni_replica_1
-      PATRONI_SCOPE: pg-cluster
-      PATRONI_RESTAPI_LISTEN: 0.0.0.0:8008
-      PATRONI_RESTAPI_CONNECT_ADDRESS: patroni_replica_1:8008
-      PATRONI_ETCD_HOSTS: etcd:2379
-      PATRONI_POSTGRESQL_DATA_DIR: /var/lib/postgresql/data
-      PATRONI_POSTGRESQL_LISTEN: 0.0.0.0:5432
-      PATRONI_POSTGRESQL_CONNECT_ADDRESS: patroni_replica_1:5432
-      PATRONI_SUPERUSER_USERNAME: postgres
-      PATRONI_SUPERUSER_PASSWORD: ${DATABASE_PASSWORD}
-      PATRONI_REPLICATION_USERNAME: replicator
-      PATRONI_REPLICATION_PASSWORD: ${DATABASE_PASSWORD}
-      PATRONI_ADMIN_USERNAME: admin
-      PATRONI_ADMIN_PASSWORD: admin
-    ports:
-      - "5433:5432"
-      - "8009:8008"
-    volumes:
-      - patroni_replica_1_data:/var/lib/postgresql/data
-    networks:
-      - patroni_network
+      ETCD_LISTEN_PEER_URLS: http://0.0.0.0:2380
+      ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
+      ETCD_INITIAL_CLUSTER: etcd1=http://etcd1:2380,etcd2=http://etcd2:2380
+      ETCD_INITIAL_CLUSTER_STATE: new
+      ETCD_INITIAL_CLUSTER_TOKEN: cluster
+      ETCD_UNSUPPORTED_ARCH: arm64
+    container_name: project-etcd1
+    hostname: etcd1
+    command: etcd --name etcd1 --initial-advertise-peer-urls http://etcd1:2380
 
-  patroni_replica_2:
-    build: ./patroni
-    environment:
-      PATRONI_NAME: patroni_replica_2
-      PATRONI_SCOPE: pg-cluster
-      PATRONI_RESTAPI_LISTEN: 0.0.0.0:8008
-      PATRONI_RESTAPI_CONNECT_ADDRESS: patroni_replica_2:8008
-      PATRONI_ETCD_HOSTS: etcd:2379
-      PATRONI_POSTGRESQL_DATA_DIR: /var/lib/postgresql/data
-      PATRONI_POSTGRESQL_LISTEN: 0.0.0.0:5432
-      PATRONI_POSTGRESQL_CONNECT_ADDRESS: patroni_replica_2:5432
-      PATRONI_SUPERUSER_USERNAME: postgres
-      PATRONI_SUPERUSER_PASSWORD: ${DATABASE_PASSWORD}
-      PATRONI_REPLICATION_USERNAME: replicator
-      PATRONI_REPLICATION_PASSWORD: ${DATABASE_PASSWORD}
-      PATRONI_ADMIN_USERNAME: admin
-      PATRONI_ADMIN_PASSWORD: admin
+  etcd2:
+    <<: *etcd
+    image: patroni
+    networks: [ project_network ]
+    container_name: project-etcd2
+    hostname: etcd2
+    command: etcd --name etcd2 --initial-advertise-peer-urls http://etcd2:2380
+
+  haproxy:
+    image: patroni
+    networks: [ project_network ]
+    env_file: patroni/docker/patroni.env
+    hostname: haproxy
     ports:
-      - "5434:5432"
-      - "8010:8008"
+      - "5000:5000"
+      - "5001:5001"
+    command: haproxy
+    environment: &haproxy_env
+      ETCDCTL_ENDPOINTS: http://etcd1:2379,http://etcd2:2379
+      PATRONI_ETCD3_HOSTS: "'etcd1:2379','etcd2:2379'"
+      PATRONI_SCOPE: project_network
+
+  patroni1:
+    image: patroni
+    networks: [ project_network ]
+    env_file: patroni/docker/patroni.env
+    hostname: patroni1
+    environment:
+      <<: *haproxy_env
+      PATRONI_NAME: patroni1
+
+  patroni2:
+    image: patroni
+    networks: [ project_network ]
+    env_file: patroni/docker/patroni.env
+    hostname: patroni2
+    environment:
+      <<: *haproxy_env
+      PATRONI_NAME: patroni2
+    depends_on:
+      - etcd1
+      - etcd2
+      - haproxy
+      - patroni1
     volumes:
-      - patroni_replica_2_data:/var/lib/postgresql/data
-    networks:
-      - patroni_network
+      - ./backup_service/backups/dump.out:/backups/dump.out
+
+
+  postgres:
+    image: postgres:latest
+    environment:
+      - POSTGRES_DB=${DATABASE_NAME}
+      - POSTGRES_USER=${DATABASE_USERNAME}
+      - POSTGRES_PASSWORD=${DATABASE_PASSWORD}
+      - MIGRATION_VERSION=${MIGRATION_VERSION:-latest}
+    ports:
+      - "${DATABASE_PORT}:5432"
+    volumes:
+      - .env:/config/env
+      - ./migrations:/migrations/
+      - ./init_scripts:/docker-entrypoint-initdb.d
 
   data_generation:
     build: ./data_generation
@@ -111,11 +88,7 @@ services:
     volumes:
       - ./data_generation:/src
     depends_on:
-      - patroni_master
-      - patroni_replica_1
-      - patroni_replica_2
-    networks:
-      - patroni_network
+      - postgres
 
   performance_test:
     build: ./performance_test
@@ -129,11 +102,8 @@ services:
       - ./performance_test:/src
       - ./performance_test/query_performance_results:/src/query_performance_results
     depends_on:
-      - patroni_master
-      - patroni_replica_1
-      - patroni_replica_2
-    networks:
-      - patroni_network
+      - postgres
+
   backup_service:
     build: ./backup_service
     environment:
@@ -148,22 +118,7 @@ services:
       - ./backup_service:/src
       - ./backup_service/backups:/src/backups
     depends_on:
-      - patroni_master
-      - patroni_replica_1
-      - patroni_replica_2
-    networks:
-      - patroni_network
+      - postgres
 
-volumes:
-  etcd_data:
-  patroni_master_data:
-  patroni_replica_1_data:
-  patroni_replica_2_data:
-
-configs:
-  patroni_master_conf:
-    file: ./patroni_master.yml
-  patroni_replica_1_conf:
-    file: ./patroni_replica_1.yml
-  patroni_replica_2_conf:
-    file: ./patroni_replica_2.yml
+networks:
+  project_network:
