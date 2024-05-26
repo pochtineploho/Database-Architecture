@@ -1,0 +1,4 @@
+Query: Most popular product
+Best Case: 48548.72
+Average Case: 48548.71999999998
+Worst Case: 48548.72

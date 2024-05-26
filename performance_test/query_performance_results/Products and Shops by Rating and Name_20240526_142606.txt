@@ -1,0 +1,4 @@
+Query: Products and Shops by Rating and Name
+Best Case: 40870.71
+Average Case: 40870.709999999985
+Worst Case: 40870.71

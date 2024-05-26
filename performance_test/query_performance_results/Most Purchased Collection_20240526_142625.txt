@@ -1,0 +1,4 @@
+Query: Most Purchased Collection
+Best Case: 15476.59
+Average Case: 15476.59000000001
+Worst Case: 15476.59

@@ -1,0 +1,4 @@
+Query: Most popular shop
+Best Case: 52164.33
+Average Case: 52164.33000000001
+Worst Case: 52164.33
