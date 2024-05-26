@@ -23,15 +23,11 @@ def run_explain_analyze(query, attempts):
             for _ in range(attempts):
                 cursor.execute(f"EXPLAIN ANALYZE {query}")
                 result = cursor.fetchall()
-                total_cost = 0
-                for row in result:
-                    if "cost=" in row[0]:
-                        # Extracting the total cost value from each row
-                        cost_part = re.search(r'cost=(\d+\.\d+)\.\.(\d+\.\d+)', row[0])
-                        if cost_part:
-                            end_cost = float(cost_part.group(2))
-                            total_cost += end_cost
-                costs.append(total_cost)
+                if "cost=" in result[0][0]:
+                    # Extracting the total cost value from each row
+                    cost_part = re.search(r'cost=(\d+\.\d+)\.\.(\d+\.\d+)', result[0][0])
+                    end_cost = float(cost_part.group(2))
+                costs.append(end_cost)
     return costs
 
 
