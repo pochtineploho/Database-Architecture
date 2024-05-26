@@ -3,6 +3,7 @@ import os
 import random
 import sys
 import uuid
+from bisect import bisect_left, bisect_right
 from datetime import datetime, timedelta
 
 import psycopg2
@@ -16,9 +17,9 @@ success = False
 while not success:
     try:
         connection = psycopg2.connect(
-            dbname=os.getenv("DATABASE_NAME"),
-            user=os.getenv("DATABASE_USERNAME"),
-            password=os.getenv("DATABASE_PASSWORD"),
+            dbname=os.getenv("POSTGRES_DB"),
+            user=os.getenv("POSTGRES_USER"),
+            password=os.getenv("POSTGRES_PASSWORD"),
             host="postgres",
             port=5432,
         )
@@ -26,6 +27,7 @@ while not success:
 
     except:
         success = False
+
     if datetime.now() - time > timedelta(seconds=time_to_connect):
         sys.exit("Connection timed out")
 
@@ -174,11 +176,12 @@ for shop_id in shops:
             """, (name, subcategory_id, photo, description, shop_id, width, height))
 print("Products generated")
 
-cur.execute("SELECT product_id FROM Products")
+cur.execute("SELECT product_id, shop_id FROM Products")
 products_t = cur.fetchall()
-products = [tup[0] for tup in products_t]
+products = [(product_id, shop_id) for product_id, shop_id in products_t]
+products.sort(key=lambda x: x[1])
 
-for product_id in products:
+for product in products:
     num_history = random.randint(1, 3)
     rnd_start_date = datetime.now() - timedelta(days=4 * 365)
     rnd_end_date = datetime.now() - timedelta(days=400)
@@ -188,7 +191,7 @@ for product_id in products:
         cur.execute("""
                     INSERT INTO PriceHistories (product_id, time, price)
                     VALUES (%s, %s, %s)
-                        """, (product_id, time, price))
+                        """, (product[0], time, price))
 
     num_structure = random.randint(0, 3)
 
@@ -202,7 +205,7 @@ for product_id in products:
         cur.execute("""
                         INSERT INTO Structures (product_id, element, quantity)
                          VALUES (%s, %s, %s)
-                        """, (product_id, element, quantity))
+                        """, (product[0], element, quantity))
 print("Structures and price histories generated")
 
 for i in range(num_records // 3):
@@ -222,8 +225,8 @@ print("Favorite lists generated")
 statuses = ['CREATED', 'IN_PROGRESS', 'CANCELED', 'DELIVERED']
 percent = 2 * num_records // 3 // 10
 for _ in range(2 * num_records // 3):
-    if _ % percent == 0:
-        print(str(_ // percent) + "% of orders")
+    if _ % percent == 0 and _ > 0:
+        print(str(_ // percent * 10) + "% of orders")
 
     random_user = random.choice(users)
     order_id = str(uuid.uuid4())
@@ -238,19 +241,20 @@ for _ in range(2 * num_records // 3):
                         """, (order_id, random_user, status, time, card_number))
 
     random_shop = random.choice(shops)
-    cur.execute("SELECT product_id FROM Products WHERE shop_id = %s", (random_shop,))
-    shop_products = cur.fetchall()
+    start = bisect_left(products, random_shop, key=lambda x: x[1])
+    end = bisect_right(products, random_shop, key=lambda x: x[1])
+    shop_products = products[start:end]
     products_for_rating = []
     used_products = []
+
     for order_details in range(random.randint(1, len(shop_products))):
         quantity = random.randint(1, 10)
-        product_id = random.choice(shop_products)
-        while product_id in used_products:
-            product_id = random.choice(shop_products)
-        used_products.append(product_id)
+        chosen_product = random.choice(shop_products)[0]
+        while chosen_product in used_products:
+            chosen_product = random.choice(shop_products)[0]
+        used_products.append(chosen_product)
 
-        products_for_rating.append(product_id)
-        shop_products.remove(product_id)
+        products_for_rating.append(chosen_product)
         cur.execute("""
                             SELECT price 
                             FROM pricehistories 
@@ -258,33 +262,29 @@ for _ in range(2 * num_records // 3):
                             AND time <= %s
                             ORDER BY time DESC 
                             LIMIT 1;
-                            """, (product_id, time))
+                            """, (chosen_product, time))
         price = cur.fetchone()
         cur.execute("""
                             INSERT INTO orderdetails (order_id, product_id, quantity, price)
                             VALUES (%s, %s, %s, %s)
-                            """, (order_id, product_id, quantity, price))
+                            """, (order_id, chosen_product, quantity, price))
 
     if fake.pybool():
-        cur.execute("""
-                    SELECT COUNT(*) FROM userreviews WHERE shop_id = %s AND user_id = %s
-                """, (random_shop, random_user))
-        count = cur.fetchone()[0]
-        if count == 0:
-            description = fake.sentence()
-            rating = generate_rating()
+        description = fake.sentence()
+        rating = generate_rating()
+        try:
+
             cur.execute("""
                                 INSERT INTO userreviews (user_id, shop_id, description, rating)
                                 VALUES (%s, %s, %s, %s)
                             """, (random_user, random_shop, description, rating))
 
+        except psycopg2.Error as e:
+            connection.rollback()
+
     if fake.pybool():
-        product_id = random.choice(products_for_rating)
-        cur.execute("""
-                            SELECT COUNT(*) FROM shopreviews WHERE product_id = %s AND user_id = %s
-                        """, (product_id, random_user))
-        count = cur.fetchone()[0]
-        if count == 0:
+        product = random.choice(products_for_rating)
+        try:
             description = fake.sentence()
             rating_1 = generate_rating()
             rating_2 = generate_rating()
@@ -294,8 +294,9 @@ for _ in range(2 * num_records // 3):
                                 INSERT INTO shopreviews (user_id, product_id, description, photo, matching_rating, service_rating, price_quality_rating)
                                 VALUES (%s, %s, %s, %s, %s, %s, %s)
                                 """,
-                        (random_user, product_id, description, photo, rating_1, rating_2, rating_3))
-
+                        (random_user, product, description, photo, rating_1, rating_2, rating_3))
+        except psycopg2.Error as e:
+            connection.rollback()
 print("Orders generated")
 print("Reviews generated")
 
@@ -310,14 +311,14 @@ for _ in range(num_records // 5):
                         """, (collection_id, user_id, description, public))
     used_products = []
     for i in range(random.randint(1, 10)):
-        product_id = random.choice(products)
-        while product_id in used_products:
-            product_id = random.choice(products)
-        used_products.append(product_id)
+        product = random.choice(products)[0]
+        while product in used_products:
+            product = random.choice(products)[0]
+        used_products.append(product)
         cur.execute("""
                             INSERT INTO collectiondetails (collection_id, product_id)
                             VALUES (%s, %s)
-                            """, (collection_id, product_id))
+                            """, (collection_id, product))
 
 print("Collections generated")
 
@@ -347,15 +348,15 @@ for user in users:
     if (counter % 5) == 0:
         used_products = []
         for i in range(random.randint(1, 10)):
-            product_id = random.choice(products)
-            while product_id in used_products:
-                product_id = random.choice(products)
-            used_products.append(product_id)
+            product = random.choice(products)[0]
+            while product in used_products:
+                product = random.choice(products)[0]
+            used_products.append(product)
             quantity = random.randint(1, 10)
             cur.execute("""
                                 INSERT INTO shoppingcarts (user_id, product_id, quantity)
                                 VALUES (%s, %s, %s)
-                                """, (user, product_id, quantity))
+                                """, (user, product, quantity))
 print("Shopping carts generated")
 print("Done")
 
