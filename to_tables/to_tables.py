@@ -5,7 +5,7 @@ import re
 from datetime import datetime
 
 # Директория с результатами
-file_path = "D:/DataGripProjects/flowwow/to_tables/resIndex"
+file_path = "D:/DataGripProjects/flowwow/to_tables/resPartition"
 
 # Регулярное выражение для извлечения данных из файлов
 pattern = re.compile(r"Query: (.+)\nBest Case: ([\d.]+)\nAverage Case: ([\d.]+)\nWorst Case: ([\d.]+)")
@@ -53,7 +53,7 @@ for file in files:
         })
 
 # Создание Excel файла с данными
-with pd.ExcelWriter('res_tables/results.xlsx') as writer:
+with pd.ExcelWriter('results.xlsx') as writer:
     for query, records in all_data.items():
         df = pd.DataFrame(records)
         df = df.sort_values(by='Timestamp')
