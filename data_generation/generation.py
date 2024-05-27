@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 import psycopg2
 from faker import Faker
 
+errs = 0
 num_records = int(os.getenv('NUM_RECORDS'))
 time_to_connect = 60
 
@@ -36,7 +37,6 @@ print("Connected successfully")
 fake = Faker(locale='ru_RU')
 max_decimal_value = decimal.Decimal('Infinity')
 max_elements_selected = 1000
-
 
 def generate_phone_number():
     r_phone_number = "+7"
@@ -87,10 +87,13 @@ for _ in range(num_records):
     email_address = fake.email()
     photo = generate_photo()
     password = fake.password()
-    cur.execute("""
-    INSERT INTO Users (name, phone_number, email_address, photo, password)
-    VALUES (%s, %s, %s, %s, %s)
-    """, (user_name, phone_number, email_address, photo, password))
+    try:
+        cur.execute("""
+        INSERT INTO Users (name, phone_number, email_address, photo, password)
+        VALUES (%s, %s, %s, %s, %s)
+        """, (user_name, phone_number, email_address, photo, password))
+    except psycopg2.Error as e:
+        errs = errs + 1
 print("Users generated")
 
 cur.execute("SELECT user_id FROM Users")
@@ -104,10 +107,13 @@ for _ in range(num_records // 5):
     description = fake.sentence()
     legal_details = fake.sentence()
     password = fake.password()
-    cur.execute("""
-    INSERT INTO Shops (name, photo, address, description, legal_details, password)
-    VALUES (%s, %s, %s, %s, %s, %s)
-    """, (shop_name, photo, address, description, legal_details, password))
+    try:
+        cur.execute("""
+        INSERT INTO Shops (name, photo, address, description, legal_details, password)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        """, (shop_name, photo, address, description, legal_details, password))
+    except psycopg2.Error as e:
+        errs = errs + 1
 print("Shops generated")
 
 cur.execute("SELECT shop_id FROM Shops")
@@ -115,25 +121,34 @@ shops_t = cur.fetchall()
 shops = [tup[0] for tup in shops_t]
 
 for category in category_names:
-    cur.execute("""
+    try:
+        cur.execute("""
        INSERT INTO Categories (name)
        VALUES (%s)
        """, (category,))
+    except psycopg2.Error as e:
+        errs = errs + 1
 print("Categories generated")
 
 for category in category_names:
-    cur.execute("""
+    try:
+        cur.execute("""
                    SELECT category_id FROM Categories 
                     WHERE name = %s
                    """, (category,))
+    except psycopg2.Error as e:
+        errs = errs + 1
     category_id = cur.fetchone()[0]
 
     for _ in range(10):
         subcategory = fake.word()
-        cur.execute("""
+        try:
+            cur.execute("""
                INSERT INTO Subcategories (name, category_id)
                VALUES (%s, %s)
                """, (subcategory, category_id))
+        except psycopg2.Error as e:
+            errs = errs + 1
 print("Subcategories generated")
 
 cur.execute("SELECT subcategory_id FROM Subcategories")
@@ -155,10 +170,13 @@ for shop_id in shops:
         else:
             max_limit = random.choice(max_limits)  # Генерация случайного максимального лимита
             max_limits.remove(max_limit)
-        cur.execute("""
+        try:
+            cur.execute("""
                 INSERT INTO DeliveryPrices (shop_id, price, max_limit)
                 VALUES (%s, %s, %s)
             """, (shop_id, price, max_limit))
+        except psycopg2.Error as e:
+            errs = errs + 1
 print("Delivery prices generated")
 
 for shop_id in shops:
@@ -170,10 +188,13 @@ for shop_id in shops:
         description = fake.sentence()
         width = random.randint(100, 300)
         height = random.randint(100, 300)
-        cur.execute("""
+        try:
+            cur.execute("""
                 INSERT INTO Products (name, subcategory_id, photo, description, shop_id, width, height)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
             """, (name, subcategory_id, photo, description, shop_id, width, height))
+        except psycopg2.Error as e:
+            errs = errs + 1
 print("Products generated")
 
 cur.execute("SELECT product_id, shop_id FROM Products")
@@ -188,11 +209,13 @@ for product in products:
     for _ in range(num_history):
         price = random.randint(100, 10000)
         time = fake.date_time_between(start_date=rnd_start_date, end_date=rnd_end_date)
-        cur.execute("""
+        try:
+            cur.execute("""
                     INSERT INTO PriceHistories (product_id, time, price)
                     VALUES (%s, %s, %s)
                         """, (product[0], time, price))
-
+        except psycopg2.Error as e:
+            errs = errs + 1
     num_structure = random.randint(0, 3)
 
     used_words = []
@@ -202,10 +225,13 @@ for product in products:
             element = fake.word()
         used_words.append(element)
         quantity = random.randint(1, 10)
-        cur.execute("""
+        try:
+            cur.execute("""
                         INSERT INTO Structures (product_id, element, quantity)
                          VALUES (%s, %s, %s)
                         """, (product[0], element, quantity))
+        except psycopg2.Error as e:
+            errs = errs + 1
 print("Structures and price histories generated")
 
 for i in range(num_records // 3):
@@ -216,14 +242,19 @@ for i in range(num_records // 3):
         while random_shop in used_shops:
             random_shop = random.choice(shops)
         used_shops.append(random_shop)
-        cur.execute("""
+        try:
+            cur.execute("""
                         INSERT INTO favoritelists (user_id, shop_id)
                         VALUES (%s, %s)
                         """, (random_user, random_shop))
+        except psycopg2.Error as e:
+            errs = errs + 1
 print("Favorite lists generated")
 
 statuses = ['CREATED', 'IN_PROGRESS', 'CANCELED', 'DELIVERED']
 percent = 2 * num_records // 3 // 10
+
+ur = {}
 for _ in range(2 * num_records // 3):
     if _ % percent == 0 and _ > 0:
         print(str(_ // percent * 10) + "% of orders")
@@ -235,12 +266,19 @@ for _ in range(2 * num_records // 3):
     rnd_end_date = datetime.now()
     time = fake.date_time_between(start_date=rnd_start_date, end_date=rnd_end_date)
     card_number = fake.credit_card_number()
-    cur.execute("""
+    try:
+        cur.execute("""
                         INSERT INTO orderheaders (order_id, user_id, status, time, card_number)
                         VALUES (%s, %s, %s, %s, %s)
                         """, (order_id, random_user, status, time, card_number))
+    except psycopg2.Error as e:
+        errs = errs + 1
 
     random_shop = random.choice(shops)
+    if random_user in ur:
+        ur[random_user].append(random_shop)
+    else:
+        ur[random_user] = [random_shop]
     start = bisect_left(products, random_shop, key=lambda x: x[1])
     end = bisect_right(products, random_shop, key=lambda x: x[1])
     shop_products = products[start:end]
@@ -264,23 +302,25 @@ for _ in range(2 * num_records // 3):
                             LIMIT 1;
                             """, (chosen_product, time))
         price = cur.fetchone()
-        cur.execute("""
+        try:
+            cur.execute("""
                             INSERT INTO orderdetails (order_id, product_id, quantity, price)
                             VALUES (%s, %s, %s, %s)
                             """, (order_id, chosen_product, quantity, price))
+        except psycopg2.Error as e:
+            errs = errs + 1
 
-    if fake.pybool():
+    if fake.pybool() and not (random_user in ur and random_shop in ur[random_user]):
         description = fake.sentence()
         rating = generate_rating()
         try:
-
             cur.execute("""
                                 INSERT INTO userreviews (user_id, shop_id, description, rating)
                                 VALUES (%s, %s, %s, %s)
                             """, (random_user, random_shop, description, rating))
 
         except psycopg2.Error as e:
-            connection.rollback()
+            errs = errs + 1
 
     if fake.pybool():
         product = random.choice(products_for_rating)
@@ -296,7 +336,7 @@ for _ in range(2 * num_records // 3):
                                 """,
                         (random_user, product, description, photo, rating_1, rating_2, rating_3))
         except psycopg2.Error as e:
-            connection.rollback()
+            errs = errs + 1
 print("Orders generated")
 print("Reviews generated")
 
@@ -305,20 +345,27 @@ for _ in range(num_records // 5):
     user_id = random.choice(users)
     description = fake.sentence()
     public = fake.pybool()
-    cur.execute("""
+    try:
+        cur.execute("""
                         INSERT INTO collectionheaders (collection_id, user_id, description, public)
                         VALUES (%s, %s, %s, %s)
                         """, (collection_id, user_id, description, public))
+    except psycopg2.Error as e:
+        errs = errs + 1
+
     used_products = []
     for i in range(random.randint(1, 10)):
         product = random.choice(products)[0]
         while product in used_products:
             product = random.choice(products)[0]
         used_products.append(product)
-        cur.execute("""
+        try:
+            cur.execute("""
                             INSERT INTO collectiondetails (collection_id, product_id)
                             VALUES (%s, %s)
                             """, (collection_id, product))
+        except psycopg2.Error as e:
+            errs = errs + 1
 
 print("Collections generated")
 
@@ -326,20 +373,26 @@ for _ in range(num_records // 5):
     dialog_id = str(uuid.uuid4())
     random_user = random.choice(users)
     random_shop = random.choice(shops)
-    cur.execute("""
-                        INSERT INTO dialogs (dialog_id, user_id, shop_id)
-                        VALUES (%s, %s, %s)
-                        """, (dialog_id, random_user, random_shop))
+    try:
+        cur.execute("""
+                            INSERT INTO dialogs (dialog_id, user_id, shop_id)
+                            VALUES (%s, %s, %s)
+                            """, (dialog_id, random_user, random_shop))
+    except psycopg2.Error as e:
+        errs = errs + 1
 
     for i in range(random.randint(1, 10)):
         message = fake.sentence()
         sender_is_user = fake.pybool()
         message_is_read = False
         time = fake.date_this_year()
-        cur.execute("""
+        try:
+            cur.execute("""
                             INSERT INTO messages (dialog_id, message, time, sender_is_user, message_is_read)
                             VALUES (%s, %s, %s, %s, %s)
                             """, (dialog_id, message, time, sender_is_user, message_is_read))
+        except psycopg2.Error as e:
+            errs = errs + 1
 print("Dialogs and messages generated")
 
 counter = 0
@@ -353,10 +406,13 @@ for user in users:
                 product = random.choice(products)[0]
             used_products.append(product)
             quantity = random.randint(1, 10)
-            cur.execute("""
-                                INSERT INTO shoppingcarts (user_id, product_id, quantity)
-                                VALUES (%s, %s, %s)
-                                """, (user, product, quantity))
+            try:
+                cur.execute("""
+                                    INSERT INTO shoppingcarts (user_id, product_id, quantity)
+                                    VALUES (%s, %s, %s)
+                                    """, (user, product, quantity))
+            except psycopg2.Error as e:
+                errs = errs + 1
 print("Shopping carts generated")
 print("Done")
 
