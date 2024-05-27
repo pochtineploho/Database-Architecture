@@ -62,7 +62,6 @@ services:
     volumes:
       - ./backup_service/backups/dump.out:/backups/dump.out
 
-
   postgres:
     image: postgres:latest
     environment:
