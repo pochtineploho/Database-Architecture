@@ -60,7 +60,7 @@ services:
       - haproxy
       - patroni1
     volumes:
-      - ./backup_service/backups/dump.out:/backups/dump.out
+      - ./dump.sql:/backups/dump.sql
 
   postgres:
     image: postgres:latest
@@ -118,6 +118,54 @@ services:
       - ./backup_service/backups:/src/backups
     depends_on:
       - postgres
+
+  emergency:
+    build: ./emergency
+    environment:
+      - POSTGRES_DB=${DATABASE_NAME}
+      - POSTGRES_USER=${DATABASE_USERNAME}
+      - POSTGRES_PASSWORD=${DATABASE_PASSWORD}
+      - POSTGRES_PORT=5432
+      - NUM_RECORDS=${ENTITIES_QUANTITY:-1000000}
+    volumes:
+      - ./emergency:/src
+    depends_on:
+      - postgres
+
+  postgres_exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:latest
+    container_name: postgres_exporter
+    environment:
+      DATA_SOURCE_NAME: "postgresql://postgres:postgres@postgres:5432/postgres?sslmode=disable"
+    ports:
+      - "9187:9187"
+    depends_on:
+      - postgres
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - prometheus_data:/prometheus
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
+volumes:
+  postgres_data:
+  prometheus_data:
+  grafana_data:
 
 networks:
   project_network:

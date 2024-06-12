@@ -15,6 +15,7 @@ def create_backup(backup_dir):
              "-d", os.getenv("POSTGRES_DB"),
              "-f", backup_file],
         env={"PGPASSWORD": os.getenv("POSTGRES_PASSWORD")},)
+
         return backup_file
     except Exception as e:
         print(f"Error creating backup: {e}")

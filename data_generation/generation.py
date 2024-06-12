@@ -275,10 +275,6 @@ for _ in range(2 * num_records // 3):
         errs = errs + 1
 
     random_shop = random.choice(shops)
-    if random_user in ur:
-        ur[random_user].append(random_shop)
-    else:
-        ur[random_user] = [random_shop]
     start = bisect_left(products, random_shop, key=lambda x: x[1])
     end = bisect_right(products, random_shop, key=lambda x: x[1])
     shop_products = products[start:end]
@@ -311,6 +307,10 @@ for _ in range(2 * num_records // 3):
             errs = errs + 1
 
     if fake.pybool() and not (random_user in ur and random_shop in ur[random_user]):
+        if random_user in ur:
+            ur[random_user].append(random_shop)
+        else:
+            ur[random_user] = [random_shop]
         description = fake.sentence()
         rating = generate_rating()
         try:
