@@ -1,0 +1,7 @@
+pg_users:
+  query: |
+    SELECT COUNT(*) FROM Users;
+  metrics:
+    - count:
+        usage: "GAUGE"
+        description: "Users counter"
