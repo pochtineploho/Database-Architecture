@@ -135,8 +135,11 @@ services:
   postgres_exporter:
     image: quay.io/prometheuscommunity/postgres-exporter:latest
     container_name: postgres_exporter
+    volumes:
+      - ./postgres_exporter/queries.yml:/src/queries.yml
     environment:
-      DATA_SOURCE_NAME: "postgresql://postgres:postgres@postgres:5432/postgres?sslmode=disable"
+      DATA_SOURCE_NAME: "postgresql://${DATABASE_USERNAME}:${DATABASE_PASSWORD}@postgres:${POSTGRES_PORT}/${DATABASE_NAME}?sslmode=disable"
+      PG_EXPORTER_EXTEND_QUERY_PATH: ./src/queries.yml
     ports:
       - "9187:9187"
     depends_on:
@@ -150,7 +153,6 @@ services:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
       - "9090:9090"
-
 
   grafana:
     image: grafana/grafana:latest
